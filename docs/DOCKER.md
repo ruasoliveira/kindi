@@ -50,6 +50,11 @@ $D fast-head
 $D bench
 ```
 
+With rootless Docker, leave out `-u $(id -u):$(id -g)`. A rootless container's root is the user who runs Docker, and
+`-u` would run Kindi as another user, which cannot write to `/data` (`Permission denied: '/data/pack...'`). The files
+Kindi writes still belong to you. `docker info -f '{{println .SecurityOptions}}'` shows `name=rootless` in rootless
+mode. `install.sh` checks this and leaves out `-u` by itself.
+
 On AMD graphics, replace `--gpus all` with the AMD devices, and add the group IDs of `video` and `render`:
 
 ```sh

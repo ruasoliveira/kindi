@@ -22,6 +22,10 @@ localhost:8093/health`.
 **Answers are slow on every turn of an agent.** Check that the agent sends the same tools and system prompt each
 time. `/health` and the server log show `prompt: N reused, M read` per request.
 
+**`PermissionError: [Errno 13] Permission denied: '/data/...'` in Docker.** With rootless Docker, `-u $(id -u):$(id -g)`
+runs Kindi as a user that cannot write to the volume. Leave out `-u` (see [DOCKER.md](DOCKER.md#commands)). With
+rootful Docker, the folder belongs to root: `sudo chown -R $(id -u):$(id -g) ~/.kindi`.
+
 **`401 invalid API key`.** The server has `api_key` set; send `Authorization: Bearer <key>`.
 
 **`the prompt has N tokens; the context is M`.** The conversation outgrew `ctx`. Let the client summarise older turns,

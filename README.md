@@ -109,7 +109,7 @@ mkdir -p ~/.kindi
 docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.3.0 info
 ```
 
-More in [docs/DOCKER.md](docs/DOCKER.md).
+With rootless Docker, leave out `-u $(id -u):$(id -g)` in this and the other commands. More in [docs/DOCKER.md](docs/DOCKER.md).
 
 ### Natively
 

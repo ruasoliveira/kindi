@@ -316,6 +316,11 @@ if [ "$DRY" = 0 ] && ! docker info >/dev/null 2>&1; then
   else die "Docker does not answer (is the daemon running? 'sudo systemctl start docker')"; fi
 fi
 ok "Docker $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ,)"
+# rootless Docker maps the host user to root in the container, and container uid 1000 to a subordinate uid that
+# cannot write to $DIR: run as the container's root there (it is the host user), and as the host user's uid elsewhere
+if $DOCKER info -f '{{println .SecurityOptions}}' 2>/dev/null | grep rootless >/dev/null; then
+  USERARGS=(); ok "rootless Docker: the containers run as their root, which is ${USER} on this host"
+else USERARGS=(-u "$(id -u):$(id -g)"); fi
 
 GPU_MODE=none
 if [ "$NG" -gt 0 ] && [ "$GPU" != cpu ]; then
@@ -638,7 +643,6 @@ gpu_args() {
   return 0
 }
 image_of() { if [ "$1" = rocm ]; then echo "kindi-rocm:${KINDI_VERSION}"; else echo "kindi:${KINDI_VERSION}"; fi; }
-UIDGID="$(id -u):$(id -g)"
 
 # ------------------------------------------------------------------------------------------------ 4. image
 src_id=""
@@ -704,7 +708,7 @@ state_of() {      # the cache folder of server i: one per model, and one per car
 }
 base_of() {
   local sd; sd=$(state_of "$1")
-  BASE=(-u "$UIDGID" -v "$DIR:/data" -e HOME=/tmp -e "CUPY_CACHE_DIR=/data/${sd}/cupy" -e "CUDA_CACHE_PATH=/data/${sd}/cudacache"
+  BASE=(${USERARGS[@]+"${USERARGS[@]}"} -v "$DIR:/data" -e HOME=/tmp -e "CUPY_CACHE_DIR=/data/${sd}/cupy" -e "CUDA_CACHE_PATH=/data/${sd}/cudacache"
         -e "KINDI_STATE_DIR=/data/${sd}" -e KINDI_CPU_CACHE=/data/cpu)
 }
 for p in ${PACKS[@]+"${PACKS[@]}"}; do
