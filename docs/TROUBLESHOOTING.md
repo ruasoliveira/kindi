@@ -26,6 +26,10 @@ time. `/health` and the server log show `prompt: N reused, M read` per request.
 runs Kindi as a user that cannot write to the volume. Leave out `-u` (see [DOCKER.md](DOCKER.md#commands)). With
 rootful Docker, the folder belongs to root: `sudo chown -R $(id -u):$(id -g) ~/.kindi`.
 
+**`could not select device driver "" with capabilities: [[gpu]]`.** The Docker daemon was started before the NVIDIA
+Container Toolkit was installed. Restart it: `sudo systemctl restart docker`, or `systemctl --user restart docker` for
+rootless Docker (restarting the rootful daemon does not restart the rootless one).
+
 **`401 invalid API key`.** The server has `api_key` set; send `Authorization: Bearer <key>`.
 
 **`the prompt has N tokens; the context is M`.** The conversation outgrew `ctx`. Let the client summarise older turns,

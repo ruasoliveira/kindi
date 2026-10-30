@@ -55,6 +55,10 @@ With rootless Docker, leave out `-u $(id -u):$(id -g)`. A rootless container's r
 Kindi writes still belong to you. `docker info -f '{{println .SecurityOptions}}'` shows `name=rootless` in rootless
 mode. `install.sh` checks this and leaves out `-u` by itself.
 
+Docker finds the NVIDIA Container Toolkit only when the daemon starts. After installing the toolkit, restart the daemon
+you use: `sudo systemctl restart docker`, or `systemctl --user restart docker` for rootless Docker. Until then,
+`--gpus all` fails with `could not select device driver "" with capabilities: [[gpu]]`.
+
 On AMD graphics, replace `--gpus all` with the AMD devices, and add the group IDs of `video` and `render`:
 
 ```sh

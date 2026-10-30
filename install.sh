@@ -318,9 +318,15 @@ fi
 ok "Docker $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ,)"
 # rootless Docker maps the host user to root in the container, and container uid 1000 to a subordinate uid that
 # cannot write to $DIR: run as the container's root there (it is the host user), and as the host user's uid elsewhere
+ROOTLESS=0
 if $DOCKER info -f '{{println .SecurityOptions}}' 2>/dev/null | grep rootless >/dev/null; then
-  USERARGS=(); ok "rootless Docker: the containers run as their root, which is ${USER} on this host"
+  ROOTLESS=1; USERARGS=(); ok "rootless Docker: the containers run as their root, which is ${USER} on this host"
 else USERARGS=(-u "$(id -u):$(id -g)"); fi
+# the daemon finds the NVIDIA container toolkit only when it starts; a rootless daemon is a service of the user
+if [ "$ROOTLESS" = 1 ]; then RESTART_DOCKER="systemctl --user restart docker"; else RESTART_DOCKER="sudo systemctl restart docker"; fi
+restart_docker() {
+  if [ "$ROOTLESS" = 1 ]; then run systemctl --user restart docker; else need_sudo; run $SUDO systemctl restart docker; fi
+}
 
 GPU_MODE=none
 if [ "$NG" -gt 0 ] && [ "$GPU" != cpu ]; then
@@ -334,7 +340,7 @@ if [ "$NG" -gt 0 ] && [ "$GPU" != cpu ]; then
         run sh -c "curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | $SUDO gpg --dearmor --yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
         run sh -c "curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | $SUDO tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null"
         run $SUDO apt-get update -qq; run $SUDO apt-get install -y -qq nvidia-container-toolkit
-        run $SUDO nvidia-ctk runtime configure --runtime=docker; run $SUDO systemctl restart docker
+        run $SUDO nvidia-ctk runtime configure --runtime=docker; restart_docker
         GPU_MODE=toolkit
       fi
     fi
@@ -679,6 +685,18 @@ for b in $BACKENDS; do
       echo "$out" | tail -5 | sed 's/^/    /'; die "the Kindi source in ${IMAGE} does not load (see above)"
     fi
     ok "the Kindi modules load"
+  fi
+  # a daemon started before the NVIDIA container toolkit was installed rejects --gpus until it restarts
+  if [ "$DRY" = 0 ] && [ "$GPU_MODE" = toolkit ] && [ "$b" != rocm ] && [ "$b" != cpu ]; then
+    gpu_args "$b"
+    if ! out=$($DOCKER run --rm ${GARGS[@]+"${GARGS[@]}"} --entrypoint true "$IMAGE" 2>&1); then
+      echo "$out" | tail -3 | sed 's/^/    /'
+      warn "Docker does not give the container the GPUs: the daemon finds the NVIDIA container toolkit only when it starts"
+      { ask "Restart Docker now (running containers stop; the ones with a restart policy start again)?" && restart_docker &&
+        $DOCKER run --rm ${GARGS[@]+"${GARGS[@]}"} --entrypoint true "$IMAGE" >/dev/null 2>&1; } ||
+        die "Docker still does not give the container the GPUs: restart it ('${RESTART_DOCKER}'), then run this again"
+    fi
+    ok "the container gets the GPUs (${GARGS[*]})"
   fi
 done
 
